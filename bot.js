@@ -31,7 +31,15 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         return;
     }
 
-  web.chat.postMessage(message.channel, `Hello,
-  I'm Scheduler Bot. Please give me access to your Google Calendar http://localhost:3000/setup?slackId=${message.user}`);
+    User.findOne(message.user)
+    .then(function(user){
+      if (user,google.isSetupComplete){
+        handleDialogflowConvo(message)
+      } else {
+      web.chat.postMessage(message.channel, `Hello,
+      I'm Scheduler Bot. Please give me access to your Google Calendar http://localhost:3000/setup?slackId=${message.user}
+      your user Id is ${user.id}.`);
+}
+    })
   });
   

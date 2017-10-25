@@ -14,12 +14,32 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use('/', routes);
 
 app.get('/setup', function (req, res){
-  var url = google.generateAuthUrl();
+  var url = google.generateAuthUrl(req.query.slackId);
   res.redirect(url)
 })
 
 app.get('/google/callback', function(req, res){
-  
+  var user;
+  var tokens;
+  User.findOne({ slackId: req.query.state})
+  .then(function(u){
+    user = u;
+    google.getToken(req.body.code);
+  })
+  .then(function(t){
+    tokens = t;
+    user.google.tokens = tokens;
+    user.google.isSetupComplete = true;
+    return user.save()
+    // return google.createCalendarEvent(tokens, 'Test Event', '2017-10-29');
+  })
+  .then(function(){
+    res.send('You are now authenticated with google. Thanks');
+  })
+  .catch(function(err){
+    console.log('Error retrieving token', err)
+    res.status(500).send('Sorry that did not work')
+  })
 })
 
 /**
