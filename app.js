@@ -24,22 +24,42 @@ app.get('/setup', function (req, res){
 
 app.get('/google/callback', function(req, res){
   var code = req.query.code;
-  google.getToken(code)
-  .then((response) => {
+  var currentUser;
+  console.log(req.query.state);
+  User.findOne({slackId: req.query.state})
+  .then(function(user) {
+    currentUser = user;
+    return google.getToken(code)
+  })
+  .then((tokens) => {
     // dialogueflow.interpretUserMessage()
-    console.log(req);
-    // User.findOne({slackId: req.})
-    res.send("WE MADE IT!")
+    currentUser.google.tokens = tokens;
+    currentUser.google.isSetupComplete = true;
+    return currentUser.save();
+    //return google.createCalendarEvent(tokens, 'Test Event', '2017-10-25')
+  })
+  .then(function(){
+    res.send('You are now authenticated with google')
   })
   .catch((error)=>console.log("Error: ", error))
-
-  // google.getToken()
 })
 
 app.post('/slack/interactive', function(req, res){
-  var parsedPayload = JSON.parse(req.body.payload);
-  console.log("\n*********************************\n", parsedPayload, "\n");
-  res.send("Your reminder was confirmed :)")
+  var payload = JSON.parse(req.body.payload);
+  console.log("\n*********************************\n", payload, "\n");
+  if(payload.actions[0].value === 'true'){
+    User.findOne({slackId: payload.user.id})
+    .then(function(user){
+      return google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date);
+    })
+    .then(function(){
+      res.send("Your reminder was confirmed :)")
+    })
+
+  } else {
+    res.send("Your reminder was canceled")
+  }
+
 })
 
 var port = process.env.PORT || 3000;

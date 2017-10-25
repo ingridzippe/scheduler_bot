@@ -19,14 +19,12 @@ function getAuthClient(){
 }
 
 module.exports = {
-    generateAuthUrl(auth_id) {
+    generateAuthUrl(slackId) {
         return getAuthClient().generateAuthUrl({
           access_type: 'offline',
           prompt: 'consent',
           scope,
-          state: encodeURIComponent(JSON.stringify({
-              auth_id
-            }))
+          state: slackId
           })
         },
 
@@ -44,13 +42,13 @@ module.exports = {
     });
   },
 
-    createCalendarEvent(tokens, title, data){
+    createCalendarEvent(tokens, title, date){
         var client = getAuthClient()
         client.setCredentials(tokens);
         return new Promise(function(resolve, reject) {
             calendar.events.insert({
                 auth: client,
-                calendarID: 'primary',
+                calendarId: 'primary',
                 resource: {
                     summary: title,
                     start: {
