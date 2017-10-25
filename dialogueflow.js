@@ -9,11 +9,11 @@ module.exports = {
                 v: '20170712',
                 query: message,
                 sessionId,
-                timezone: 'America/LosAngeles',
+                timezone: 'America/Los_Angeles',
                 lang: 'en'
             },
             headers: {
-                Authorization: `Bearer ${process.env.SLACK_API_TOKEN}`
+                Authorization: `Bearer ${process.env.API_AI_TOKEN}`
             }
         });
     }

@@ -5,19 +5,51 @@ var token = process.env.SLACK_API_TOKEN || '';
 
 var rtm = new RtmClient(token);
 var web = new WebClient(token);
+
+var User = require('./models/models');
 rtm.start();
 
 function handleDialogflowConvo(message) {
 dialogueflow.interpretUserMessage(message.text, message.user)
 .then(function(res){
   var { data } = res;
-  console.log('DIALOGFLOW RESPONSE', res.data);
-    if(web.result.actionIncomplete){
+    if(data.result.actionIncomplete){
       web.chat.postMessage(message.channel, data.result.fulfillment.speech)
     } else {
+
+      var attachments = [
+         {
+             "callback_id": "schedule_response",
+             "attachment_type": "default",
+             "fallback": "You have no friends",
+             "actions": [
+                 {
+                     "name": "confirm",
+                     "text": "Yes",
+                     "type": "button",
+                     "value": "yes"
+                 },
+                 {
+                     "name": "deny",
+                     "text": "No",
+                     "type": "button",
+                     "value": "no"
+                 }
+             ]
+         }
+     ]
+
       web.chat.postMessage(message.channel,
-           `You asked me to remind you to ${data.result.parameters.description} on 
-           ${data.result.parameters.date}.`)
+           `Would you like me to remind you to ${data.result.parameters.subject} on
+           ${data.result.parameters.date}?`,
+           {attachments: attachments},
+         function(err, res){
+           if( err ){
+             console.log('error: ', err);
+           } else {
+             console.log('Reply sent ', res);
+           }
+         })
     }
 })
 .catch(function(err){
@@ -26,12 +58,23 @@ dialogueflow.interpretUserMessage(message.text, message.user)
 }
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
-    if (! messsage.user){
+    if (! message.user){
         console.log('message sent by bot, ignoring');
         return;
     }
+    User.findOne({slackId: message.user}, function(err, res){
+      if(err){
+        console.log("Error, ", err);
+      } else if (!res){
+        var newUser = new User({
+          slackId: message.user,
+          channel: message.channel
+        })
+        newUser.save()
+        .then(web.chat.postMessage(message.channel, `Hello, I'm Scheduler Bot. Please give me access to your Google Calendar https://98bfa26b.ngrok.io/setup?slackId=${message.user}`))
+      } else {
+        handleDialogflowConvo(message);
+      }
+    })
 
-  web.chat.postMessage(message.channel, `Hello,
-  I'm Scheduler Bot. Please give me access to your Google Calendar http://localhost:3000/setup?slackId=${message.user}`);
   });
-  
