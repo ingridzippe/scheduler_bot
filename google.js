@@ -5,28 +5,29 @@ var calendar = google.calendar('v3');
 var OAuth2 = google.auth.OAuth2;
 
 var scope = [
-    'https://www.googleapis.com/auth/plus.me',
+    'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/calendar'
   ];
-  
+
 
 function getAuthClient(){
     return new OAuth2(
         process.env.GOOGLE_CLIENT_ID,
-        process.env.GOOGLE_CLIENT_SECRET,
-        'http://localhost:3000/google/callback'
+        process.env.GOOGLE_SECRET,
+        'http://98bfa26b.ngrok.io/google/callback'
       );
 }
 
 module.exports = {
-    generateAuthUrl() {
+    generateAuthUrl(slackId) {
         return getAuthClient().generateAuthUrl({
           access_type: 'offline',
           prompt: 'consent',
-          scope
-          // state: 'foo'
-        });
-      },
+          scope,
+          state: slackId
+          })
+        },
+
 
     getToken(code) {
     var client = getAuthClient();
@@ -41,13 +42,13 @@ module.exports = {
     });
   },
 
-    createCalendarEvent(tokens, title, data){
+    createCalendarEvent(tokens, title, date){
         var client = getAuthClient()
         client.setCredentials(tokens);
         return new Promise(function(resolve, reject) {
             calendar.events.insert({
-                authL client,
-                calendarID: 'primary',
+                auth: client,
+                calendarId: 'primary',
                 resource: {
                     summary: title,
                     start: {

@@ -6,48 +6,75 @@ var token = process.env.SLACK_API_TOKEN || '';
 var rtm = new RtmClient(token);
 var web = new WebClient(token);
 
+var User = require('./models/models');
 rtm.start();
 
-
+function handleDialogflowConvo(user, message) {
 dialogueflow.interpretUserMessage(message.text, message.user)
 .then(function(res){
-    if(web.result.actionIncomplete){
+  var { data } = res;
+    if(data.result.actionIncomplete){
       web.chat.postMessage(message.channel, data.result.fulfillment.speech)
     } else {
+      user.pending.subject = data.result.parameters.subject;
+      user.pending.date = data.result.parameters.date;
+      return user.save()
+      .then(function(){
+        console.log("In print attachments");
+        var attachments = [
+           {
+               "callback_id": "schedule_response",
+               "attachment_type": "default",
+               "fallback": "You have no friends",
+               "actions": [
+                   {
+                       "name": "confirm",
+                       "text": "Yes",
+                       "type": "button",
+                       "value": "true",
+                       "style": "default"
+                   },
+                   {
+                       "name": "deny",
+                       "text": "No",
+                       "type": "button",
+                       "value": "false",
+                       "style": "danger"
+                   }
+               ]
+           }
+       ]
       web.chat.postMessage(message.channel,
-           `You asked me to remind you to ${} on ${}.`)
+           `Would you like me to remind you to ${data.result.parameters.subject} on
+           ${data.result.parameters.date}?`,
+           {attachments: attachments},
+         function(err, res){
+           if( err ){
+             console.log('error: ', err);
+           } else {
+             console.log('Reply sent ', res);
+           }
+         })
+       })
+      .catch(function(err){
+        console.log('Error sending message to Dialogflow', err)
+      })
     }
-})
-.catch(function(err){
-    console.log('Error sending message to slack', err)
-})
-web.chat.postMessage( message.channel, `You said: ${message.text}`)
-//   rtm.sendMessage('hi', message.channel)
-
-
+  })
+}
 
 rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
-    if (! messsage.user){
-        console.log('message sent by bot, ignoring')
+    if (! message.user){
+        console.log('message sent by bot, ignoring');
+        return;
     }
-    web.chat.postMessage(message.channel, `Hello`)
+    User.findOrCreate(message.user)
+    .then(function(user){
+      if (user.google.isSetupComplete) {
+        handleDialogflowConvo(user, message);
+      } else {
+        web.chat.postMessage(message.channel, `Hello,
+  I'm Scheduler Bot. Please give me access to your Google Calendar https://98bfa26b.ngrok.io/setup?slackId=${message.user}`)
+      }
+    });
   });
-
-  // axios.get({
-  //   url: 'https://slack.com/api/chat.postMessage?token=' + token + '&channel=' + message.channel + '&text=Hello World!',
-  //   method: 'get'
-  // })
-  // .then(function (response) {
-  //   // console.log(response);
-  // })
-  // .catch(function (error) {
-  //   // console.log(error);
-  // });;
-
-rtm.on(RTM_EVENTS.REACTION_ADDED, function handleRtmReactionAdded(reaction) {
-  console.log('Reaction added:', reaction);
-});
-
-rtm.on(RTM_EVENTS.REACTION_REMOVED, function handleRtmReactionRemoved(reaction) {
-  console.log('Reaction removed:', reaction);
-});

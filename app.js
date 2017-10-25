@@ -5,6 +5,10 @@ var bodyParser = require('body-parser');
 var routes = require('./routes/routes');
 var app = express();
 var axios = require('axios')
+var google = require('./google');
+var dialogueflow = require('./dialogueflow');
+
+var User = require('./models/models')
 
 require('./bot')
 
@@ -14,51 +18,49 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use('/', routes);
 
 app.get('/setup', function (req, res){
-  var url = google.generateAuthUrl();
+  var url = google.generateAuthUrl(req.query.slackId);
   res.redirect(url)
 })
 
 app.get('/google/callback', function(req, res){
-  
+  var code = req.query.code;
+  var currentUser;
+  console.log(req.query.state);
+  User.findOne({slackId: req.query.state})
+  .then(function(user) {
+    currentUser = user;
+    return google.getToken(code)
+  })
+  .then((tokens) => {
+    // dialogueflow.interpretUserMessage()
+    currentUser.google.tokens = tokens;
+    currentUser.google.isSetupComplete = true;
+    return currentUser.save();
+    //return google.createCalendarEvent(tokens, 'Test Event', '2017-10-25')
+  })
+  .then(function(){
+    res.send('You are now authenticated with google')
+  })
+  .catch((error)=>console.log("Error: ", error))
 })
 
-/**
- * Example for creating and working with the Slack RTM API.
- */
+app.post('/slack/interactive', function(req, res){
+  var payload = JSON.parse(req.body.payload);
+  console.log("\n*********************************\n", payload, "\n");
+  if(payload.actions[0].value === 'true'){
+    User.findOne({slackId: payload.user.id})
+    .then(function(user){
+      return google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date);
+    })
+    .then(function(){
+      res.send("Your reminder was confirmed :)")
+    })
 
-/* eslint no-console:0 */
+  } else {
+    res.send("Your reminder was canceled")
+  }
 
-
-// catch 404 and forward to error handler
-// app.use(function(req, res, next) {
-//   var err = new Error('Not Found');
-//   err.status = 404;
-//   next(err);
-// });
-
-// error handlers
-
-// development error handler
-// will print stacktrace
-// if (app.get('env') === 'development') {
-//   app.use(function(err, req, res, next) {
-//     res.status(err.status || 500);
-//     res.render('error', {
-//       message: err.message,
-//       error: err
-//     });
-//   });
-// }
-
-// // production error handler
-// // no stacktraces leaked to user
-// app.use(function(err, req, res, next) {
-//   res.status(err.status || 500);
-//   res.render('error', {
-//     message: err.message,
-//     error: {}
-//   });
-// });
+})
 
 var port = process.env.PORT || 3000;
 app.listen(port);
