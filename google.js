@@ -15,7 +15,7 @@ function getAuthClient(){
     return new OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_SECRET,
-        'http://f7bff0ec.ngrok.io/google/callback'
+        `${process.env.DOMAIN}/google/callback`
       );
 }
 
@@ -98,5 +98,35 @@ module.exports = {
                 }
             });
         });
-}
+      },
+
+      recheckExpiration(originalUser, expToken) {
+        var today = new Date().valueOf()
+        var tokens = originalUser.google.tokens;
+        if (today > expToken){
+        var authClient = getAuthClient()
+        authClient.setCredentials({
+                access_token: originalUser.google.tokens.access_token,
+                refresh_token: originalUser.google.tokens.refresh_token,
+                expiry_date: (new Date()).getTime() + (1000 * 60 * 60 * 24 * 7)
+              })
+        authClient.refreshAccessToken(function(err, tokens){
+            console.log(tokens)
+            if (err){
+                console.log('there was an error: ', err)
+            }
+            User.update({slackId: originalUser.slackId}, {
+                google: {
+                    tokens: tokens
+            }}).exec(function(err, raw){
+                if (err){
+                    console.log(`there was an error`)
+                } else {
+                    return console.log('Your user has been saved with the new tokens')
+                }
+              }
+            )
+          })
+        }
+      }
 }
