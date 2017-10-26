@@ -3,6 +3,7 @@ var mongoose = require('mongoose');
 mongoose.Promise = global.Promise;
 // Step 0: Remember to add your MongoDB information in one of the following ways!
 var connect = process.env.MONGODB_URI;
+
 mongoose.connect(connect);
 
 var Schema = mongoose.Schema
