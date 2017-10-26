@@ -3,7 +3,7 @@
 var google2= require('googleapis');
 var calendar = google2.calendar('v3');
 var OAuth2 = google2.auth.OAuth2;
-var User = require('./models/models')
+var {User, Reminder} = require('./models/models')
 
 var scope = [
     'https://www.googleapis.com/auth/userinfo.profile',

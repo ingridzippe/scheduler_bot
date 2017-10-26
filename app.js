@@ -62,8 +62,9 @@ app.post('/slack/interactive', function(req, res){
   }
 
 
-         //from Ingrid
 
+
+         //from Ingrid
 
          var d = new Date(user.pending.date);
          console.log('d', d);
@@ -77,7 +78,10 @@ app.post('/slack/interactive', function(req, res){
          console.log('REMINDER', reminder)
          reminder.save(function(err, reminder) {
            if (err) { console.log('error') }
-         });
+         })
+         .then(function(){
+           res.send("Your reminder was confirmed :)")
+         })
          // console.log('req.body.payload', req.body.payload);
          var today = new Date();
          console.log('today', today);
@@ -96,16 +100,6 @@ app.post('/slack/interactive', function(req, res){
          Reminder.find({date: todayFormatted}, function(err, remindersToday) {
            console.log('REMINDERS TODAY', remindersToday);
          })
-       })
-     } else {
-       res.send("Your reminder was canceled")
-     }
-  })
-  .then(function(user){
-    user.pending = null;
-    return user.save()
-  })
- })
 
 var port = process.env.PORT || 80;
 app.listen(port);
