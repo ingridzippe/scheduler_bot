@@ -7,7 +7,7 @@ var token = process.env.SLACK_API_TOKEN || '';
 var rtm = new RtmClient(token);
 var web = new WebClient(token);
 
-var User = require('./models/models');
+var {User, Reminder} = require('./models/models');
 rtm.start();
 
 function generateAttachments(){

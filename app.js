@@ -57,7 +57,6 @@ app.post('/slack/interactive', function(req, res){
 
          //from Ingrid
 
-
          var d = new Date(user.pending.date);
          console.log('d', d);
          var dateFormatted = [d.getUTCDate(), d.getUTCMonth() + 1, d.getUTCFullYear()].join('-');
@@ -89,9 +88,6 @@ app.post('/slack/interactive', function(req, res){
          Reminder.find({date: todayFormatted}, function(err, remindersToday) {
            console.log('REMINDERS TODAY', remindersToday);
          })
-
-
-
 
        })
      } else {
