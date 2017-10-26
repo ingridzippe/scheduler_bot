@@ -8,7 +8,7 @@ var axios = require('axios')
 var google = require('./google');
 var dialogueflow = require('./dialogueflow');
 
-var User = require('./models/models')
+var { User, Reminder } = require('./models/models')
 
 require('./bot')
 
@@ -45,22 +45,64 @@ app.get('/google/callback', function(req, res){
 })
 
 app.post('/slack/interactive', function(req, res){
+  console.log("In callback");
   var payload = JSON.parse(req.body.payload);
-  console.log("\n*********************************\n", payload, "\n");
-  if(payload.actions[0].value === 'true'){
-    User.findOne({slackId: payload.user.id})
-    .then(function(user){
-      return google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date);
-    })
-    .then(function(){
-      res.send("Your reminder was confirmed :)")
-    })
+  console.log(payload);
+  User.findOne({slackId: payload.user.id})
+  .then(function(){
+    if(payload.actions[0].value === 'true'){
+       google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date)
+       .then(function(){
+         res.send("Your reminder was confirmed :)")
 
-  } else {
-    res.send("Your reminder was canceled")
-  }
+         //from Ingrid
 
-})
+
+         var d = new Date(user.pending.date);
+         console.log('d', d);
+         var dateFormatted = [d.getUTCDate(), d.getUTCMonth() + 1, d.getUTCFullYear()].join('-');
+         console.log('dateFormatted', dateFormatted)
+         var reminder = new Reminder({
+           subject: message.text,
+           date: dateFormatted,
+           userId: message.user
+         })
+         console.log('REMINDER', reminder)
+         reminder.save(function(err, reminder) {
+           if (err) { console.log('error') }
+         });
+         // console.log('req.body.payload', req.body.payload);
+         var today = new Date();
+         console.log('today', today);
+         var todayFormatted = [today.getUTCDate(), today.getUTCMonth() + 1, today.getUTCFullYear()].join('-');
+         console.log('todayFormatted', todayFormatted);
+         var tomMillis = today.setDate(today.getDate() + 1);
+         console.log('tomMillis', tomMillis)
+         var tomorrow = new Date(tomMillis);
+         console.log('tomorrow', tomorrow);
+         var tomorrowFormatted = [tomorrow.getUTCDate(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCFullYear()].join('-');
+         // reminders for today
+         Reminder.find({date: tomorrowFormatted}, function(err, remindersTomorrow) {
+           console.log('REMINDERS TOMORROW', remindersTomorrow);
+         })
+         // reminders for today
+         Reminder.find({date: todayFormatted}, function(err, remindersToday) {
+           console.log('REMINDERS TODAY', remindersToday);
+         })
+
+
+
+
+       })
+     } else {
+       res.send("Your reminder was canceled")
+     }
+  })
+  .then(function(user){
+    user.pending = null;
+    return user.save()
+  })
+ })
 
 var port = process.env.PORT || 3000;
 app.listen(port);

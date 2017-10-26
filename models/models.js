@@ -17,10 +17,7 @@ var UserSchema = new mongoose.Schema({
       isSetupComplete: Boolean,
       default: false
     },
-    pending: {
-      date: String,
-      subject: String
-    }
+    pending: Object
     // Channel: String,
     // Consent: String,
     // Tokens: {
@@ -31,6 +28,21 @@ var UserSchema = new mongoose.Schema({
     // }
 })
 
+var ReminderSchema = new mongoose.Schema({
+    subject: {
+      type: String,
+      required: true
+    },
+    date: {
+      type: String,
+      required: false
+    },
+    userId: {
+      type: String,
+      required: true
+    }
+})
+
 UserSchema.statics.findOrCreate = function(slackId) {
   return User.findOne({slackId})
   .then(function(user){
@@ -39,5 +51,9 @@ UserSchema.statics.findOrCreate = function(slackId) {
   })
 }
 var User = mongoose.model('User', UserSchema);
+var Reminder = mongoose.model('Reminder', ReminderSchema);
 
-module.exports = User;
+module.exports = {
+  User,
+  Reminder
+};
