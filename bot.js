@@ -1,5 +1,6 @@
 var { WebClient, RtmClient, RTM_EVENTS } = require('@slack/client');
 var dialogueflow = require('./dialogueflow')
+var google = require('./google')
 
 var token = process.env.SLACK_API_TOKEN || '';
 
@@ -20,7 +21,6 @@ dialogueflow.interpretUserMessage(message.text, message.user)
       user.pending.date = data.result.parameters.date;
       return user.save()
       .then(function(){
-        console.log("In print attachments");
         var attachments = [
            {
                "callback_id": "schedule_response",
@@ -45,8 +45,7 @@ dialogueflow.interpretUserMessage(message.text, message.user)
            }
        ]
       web.chat.postMessage(message.channel,
-           `Would you like me to remind you to ${data.result.parameters.subject} on
-           ${data.result.parameters.date}?`,
+           `Would you like me to remind you to ${data.result.parameters.subject} on ${data.result.parameters.date}?`,
            {attachments: attachments},
          function(err, res){
            if( err ){
@@ -71,10 +70,11 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
     User.findOrCreate(message.user)
     .then(function(user){
       if (user.google.isSetupComplete) {
+        google.recheckExpiration(user, user.google.tokens.expiry_date)
         handleDialogflowConvo(user, message);
       } else {
         web.chat.postMessage(message.channel, `Hello,
-  I'm Scheduler Bot. Please give me access to your Google Calendar https://98bfa26b.ngrok.io/setup?slackId=${message.user}`)
+  I'm Scheduler Bot. Please give me access to your Google Calendar https://f7bff0ec.ngrok.io/setup?slackId=${message.user}`)
       }
     });
   });

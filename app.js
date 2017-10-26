@@ -25,7 +25,7 @@ app.get('/setup', function (req, res){
 app.get('/google/callback', function(req, res){
   var code = req.query.code;
   var currentUser;
-  console.log(req.query.state);
+  // console.log(req.query.state);
   User.findOne({slackId: req.query.state})
   .then(function(user) {
     currentUser = user;
@@ -46,7 +46,6 @@ app.get('/google/callback', function(req, res){
 
 app.post('/slack/interactive', function(req, res){
   var payload = JSON.parse(req.body.payload);
-  console.log("\n*********************************\n", payload, "\n");
   if(payload.actions[0].value === 'true'){
     User.findOne({slackId: payload.user.id})
     .then(function(user){
@@ -62,7 +61,7 @@ app.post('/slack/interactive', function(req, res){
 
 })
 
-var port = process.env.PORT || 3000;
+var port = process.env.PORT || 80;
 app.listen(port);
 console.log('Express started. Listening on port %s', port);
 

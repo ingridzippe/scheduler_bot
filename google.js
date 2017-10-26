@@ -1,8 +1,9 @@
 'use strict'
 
-var google = require('googleapis');
-var calendar = google.calendar('v3');
-var OAuth2 = google.auth.OAuth2;
+var google2= require('googleapis');
+var calendar = google2.calendar('v3');
+var OAuth2 = google2.auth.OAuth2;
+var User = require('./models/models')
 
 var scope = [
     'https://www.googleapis.com/auth/userinfo.profile',
@@ -14,7 +15,7 @@ function getAuthClient(){
     return new OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_SECRET,
-        'http://98bfa26b.ngrok.io/google/callback'
+        'http://f7bff0ec.ngrok.io/google/callback'
       );
 }
 
@@ -28,6 +29,35 @@ module.exports = {
           })
         },
 
+    recheckExpiration(originalUser, expToken) {
+        var today = new Date().valueOf()
+        var tokens = originalUser.google.tokens;
+        if (today > expToken){
+        var authClient = getAuthClient()
+        authClient.setCredentials({
+                access_token: originalUser.google.tokens.access_token,
+                refresh_token: originalUser.google.tokens.refresh_token,
+                expiry_date: (new Date()).getTime() + (1000 * 60 * 60 * 24 * 7)
+              })
+        authClient.refreshAccessToken(function(err, tokens){
+            console.log(tokens)
+            if (err){
+                console.log('there was an error: ', err)
+            }
+            User.update({slackId: originalUser.slackId}, {
+                google: {
+                    tokens: tokens
+            }}).exec(function(err, raw){
+                if (err){
+                    console.log(`there was an error`)
+                } else { 
+                    return console.log('Your user has been saved with the new tokens')
+                }
+        }
+            )
+        })
+    }
+},
 
     getToken(code) {
     var client = getAuthClient();
