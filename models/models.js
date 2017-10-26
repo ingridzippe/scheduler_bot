@@ -43,6 +43,18 @@ var ReminderSchema = new mongoose.Schema({
     }
 })
 
+var MeetingSchema = new mongoose.Schema({
+    summary: { type: String, required: true },
+    description: { type: String, required: false },
+    times: {
+      start: { type: Date, required: true },
+      end: { type: Date, required: true },
+      timeZone: { type: String, required: true }
+    },
+    attendees: { type: Array, required: true },
+    pending: { type: Boolean, required: true }
+});
+
 UserSchema.statics.findOrCreate = function(slackId) {
   return User.findOne({slackId})
   .then(function(user){
@@ -52,8 +64,10 @@ UserSchema.statics.findOrCreate = function(slackId) {
 }
 var User = mongoose.model('User', UserSchema);
 var Reminder = mongoose.model('Reminder', ReminderSchema);
+var Meeting = mongoose.model('Meeting', MeetingSchema);
 
 module.exports = {
   User,
-  Reminder
-};
+  Reminder,
+  Meeting
+}; 

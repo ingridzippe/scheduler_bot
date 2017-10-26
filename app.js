@@ -53,7 +53,7 @@ app.post('/slack/interactive', function(req, res){
     if(payload.actions[0].value === 'true'){
        google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date)
        .then(function(){
-         res.send("Your reminder was confirmed :)")
+
 
          //from Ingrid
 
@@ -69,7 +69,10 @@ app.post('/slack/interactive', function(req, res){
          console.log('REMINDER', reminder)
          reminder.save(function(err, reminder) {
            if (err) { console.log('error') }
-         });
+         })
+         .then(function(){
+           res.send("Your reminder was confirmed :)")
+         })
          // console.log('req.body.payload', req.body.payload);
          var today = new Date();
          console.log('today', today);
