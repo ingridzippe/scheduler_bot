@@ -3,7 +3,7 @@
 var google2= require('googleapis');
 var calendar = google2.calendar('v3');
 var OAuth2 = google2.auth.OAuth2;
-var {User, Reminder} = require('./models/models')
+var {User, Reminder, Meeting} = require('./models/models')
 
 var scope = [
     'https://www.googleapis.com/auth/userinfo.profile',
@@ -21,68 +21,10 @@ function getAuthClient(){
 
 function createSimpleEvent(client, tokens, title, date){
   console.log(title, 'line 23');
-  return new Promise(function(resolve, reject) {
-      calendar.events.insert({
-          auth: client,
-          calendarId: 'primary',
-          resource: {
-              summary: title,
-              start: {
-                  date,
-                  'timeZone': 'America/Los_Angeles'
-              },
-              end: {
-                  date,
-                  'timeZone': 'America/Los_Angeles'
-              }
-          }
-      }, function(err, res){
-          if (err){
-              reject(err)
-          } else {
-              resolve(tokens)
-          }
-      });
-  });
+
 }
 
-function createMeeting(client, tokens, title, date, time, attendees, duration, location){
-  console.log(duration, 50);
-  var startDateTime = new Date (date + 'T' + time);
-  var endDateTime = new Date(startDateTime);
-  var durHours = 0;
-  var durMin = 30;
-  if(duration){
-    durHours = duration.unit === 'h'? duration.amount : 0;
-    durMin = duration.unit === 'm'? duration.amount : 0;
-  }
-  endDateTime.setHours(endDateTime.getHours() + parseInt(durHours));
-  endDateTime.setMinutes(endDateTime.getMinutes() + parseInt(durMin));
-  return new Promise(function(resolve, reject) {
-      calendar.events.insert({
-          auth: client,
-          calendarId: 'primary',
-          resource: {
-              summary: title,
-              start: {
-                  dateTime: startDateTime,
-                  'timeZone': 'America/Los_Angeles'
-              },
-              end: {
-                  dateTime: endDateTime,
-                  'timeZone': 'America/Los_Angeles'
-              },
-              'attendees': attendees
-          }
-      }, function(err, res){
-          if (err){
-              reject(err)
-          } else {
-              resolve(tokens)
-          }
-      });
-  });
-}
+
 
 module.exports = {
     generateAuthUrl(slackId) {
@@ -108,15 +50,63 @@ module.exports = {
     });
   },
 
-    createCalendarEvent(tokens, title, date, time, attendees, duration, location){
+    createCalendarEvent(tokens, title, date){
       console.log(title);
         var client = getAuthClient()
         client.setCredentials(tokens);
-        if(attendees){
-          return createMeeting(client, tokens, title, date, time, attendees, duration);
-        } else {
-          return createSimpleEvent(client, tokens, title, date);
-        }
+        return new Promise(function(resolve, reject) {
+            calendar.events.insert({
+                auth: client,
+                calendarId: 'primary',
+                resource: {
+                    summary: title,
+                    start: {
+                        date,
+                        'timeZone': 'America/Los_Angeles'
+                    },
+                    end: {
+                        date,
+                        'timeZone': 'America/Los_Angeles'
+                    }
+                }
+            }, function(err, res){
+                if (err){
+                    reject(err)
+                } else {
+                    resolve(tokens)
+                }
+            });
+        });
+      },
+
+      createMeeting(tokens, meeting){
+        console.log(meeting.summary, 83);
+        var client = getAuthClient()
+        client.setCredentials(tokens);
+        return new Promise(function(resolve, reject) {
+            calendar.events.insert({
+                auth: client,
+                calendarId: 'primary',
+                resource: {
+                    summary: meeting.summary,
+                    start: {
+                        dateTime: meeting.times.start,
+                        timeZone: 'America/Los_Angeles'
+                    },
+                    end: {
+                        dateTime: meeting.times.end,
+                        timeZone: 'America/Los_Angeles'
+                    },
+                    attendees: meeting.attendees
+                }
+            }, function(err, res){
+                if (err){
+                    reject(err)
+                } else {
+                    resolve(tokens)
+                }
+            });
+        });
       },
 
       recheckExpiration(originalUser, expToken) {

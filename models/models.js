@@ -15,7 +15,8 @@ var UserSchema = new mongoose.Schema({
     google: {
       tokens: Object,
       isSetupComplete: Boolean,
-      default: false
+      default: false,
+      email: String
     },
     pending: Object
     // Channel: String,
@@ -52,7 +53,8 @@ var MeetingSchema = new mongoose.Schema({
       timeZone: { type: String, required: true }
     },
     attendees: { type: Array, required: true },
-    pending: { type: Boolean, required: true }
+    pending: { type: Boolean, required: true },
+    duration: { unit: String, amount: Number}
 });
 
 UserSchema.statics.findOrCreate = function(slackId) {
@@ -70,4 +72,4 @@ module.exports = {
   User,
   Reminder,
   Meeting
-}; 
+};

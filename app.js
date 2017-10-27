@@ -8,7 +8,7 @@ var axios = require('axios')
 var google = require('./google');
 var dialogueflow = require('./dialogueflow');
 
-var { User, Reminder } = require('./models/models')
+var { User, Reminder, Meeting } = require('./models/models')
 
 require('./bot')
 
@@ -53,16 +53,59 @@ app.post('/slack/interactive', function(req, res){
   User.findOne({slackId: payload.user.id})
   .then(function(user){
     if(payload.actions[0].value === 'true'){
-      (user.pending.day ?
-      google.createCalendarEvent(user.google.tokens, 'meeting with' + user.pending.invitee[0], user.pending.day, user.pending.time, user.pending.invitee, user.pending.duration) :
-      google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date))
-      .then(function(){
-        user.pending = null;
-        return user.save()
-      })
-      .then(()=>{
-        res.send("Your reminder has been saved")
-      })
+      if ( user.pending.day ){
+        var meeting = user.pending;
+        var startDateTime = new Date (meeting.day + 'T' + meeting.time);
+        var endDateTime = new Date(startDateTime);
+        var durHours = 0;
+        var durMin = 30;
+        if(meeting.duration){
+          durHours = meeting.duration.unit === 'h'? meeting.duration.amount : 0;
+          durMin = meeting.duration.unit === 'm'? meeting.duration.amount : 0;
+        }
+        endDateTime.setHours(endDateTime.getHours() + parseInt(durHours));
+        endDateTime.setMinutes(endDateTime.getMinutes() + parseInt(durMin));
+
+        var summary = 'Meeting with ';
+        meeting.invitee.forEach(function(person, index){
+          if(index === meeting.invitee.length - 1 && meeting.invitee.length > 1){
+            summary = summary + ` and ${person.name}`
+          } else {
+            summary = summary + ` ${person.name},`
+          }
+        })
+        console.log(meeting.invitee, 77);
+        var newMeeting = new Meeting({
+            summary: summary,
+            description: meeting.topic,
+            times: {
+              start: startDateTime,
+              end: endDateTime,
+              timeZone: 'America/Los_Angeles'
+            },
+            attendees: meeting.invitee,
+            pending: true,
+            duration: meeting.duration ? meeting.duration : {unit: 'm', amount: 30}
+        })
+        newMeeting.save()
+        .then(()=>google.createMeeting(user.google.tokens, newMeeting))
+        .then(function(){
+          user.pending = null;
+          return user.save()
+        })
+        .then(()=>{
+          res.send("Your reminder has been saved")
+        })
+      } else {
+        google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date)
+        .then(function(){
+          user.pending = null;
+          return user.save()
+        })
+        .then(()=>{
+          res.send("Your reminder has been saved")
+        })
+      }
      } else {
        user.pending = null;
        return user.save()
