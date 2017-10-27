@@ -43,6 +43,7 @@ function generateText(data){
   var text;
   var invites = '';
   var duration = '';
+  console.log(data, 46);
   if(data.invitee){
     data.invitee.forEach(function(person, index){
       if(index === data.invitee.length - 1 && data.invitee.length > 1){
@@ -122,18 +123,22 @@ function generateText(data){
 // }
 
 function handleDialogflowConvo(user, message) {
-  console.log(message);
-  if(user.pending.date){
-    return web.chat.postMessage(lastMessage.channel,
-       "You first must repond to the most recent prompt:\n" + generateText(lastMessage.parameters),
-       {attachments: generateAttachments()},
-     function(err, res){
-       if( err ){
-         console.log('error: ', err);
-       } else {
-         console.log('Reply sent ', res);
-       }
-     })
+  console.log("USER PENDING", user.pending);
+  if(user.pending){
+    return web.im.open(user.slackId)
+    .then((res)=>{
+      return web.chat.postMessage(res.channel.id,
+         "You first must repond to the most recent prompt:\n" + generateText(user.pending),
+         {attachments: generateAttachments()},
+       function(err, res){
+         if( err ){
+           console.log('error: ', err);
+         } else {
+           console.log('Reply sent ', res);
+         }
+       });
+    })
+
   }
   web.users.list(message.team)
   .then(function(response){
@@ -156,7 +161,7 @@ function handleDialogflowConvo(user, message) {
       if(data.result.actionIncomplete){
         web.chat.postMessage(message.channel, data.result.fulfillment.speech)
       } else {
-        user.pending = Object.assign({}, data.parameters);
+        user.pending = Object.assign({}, data.result.parameters);
         user.save()
         .then(function(){
           lastMessage.channel = message.channel;
@@ -183,22 +188,15 @@ function handleDialogflowConvo(user, message) {
 
 rtm.on(RTM_EVENTS.PRESENCE_CHANGE, function(event){
   console.log(event);
-  if(event.user !== 'U7PCCHUP3'){
+  if(event.user !== 'U7PCCHUP3' && event.user !== 'U7QRBG10V' && event.user !== 'U7N5D1KPT'){
     var today = new Date();
-    console.log('today', today);
     var todayFormatted = [today.getUTCDate(), today.getUTCMonth() + 1, today.getUTCFullYear()].join('-');
-    console.log('todayFormatted', todayFormatted);
     var tomMillis = today.setDate(today.getDate() + 1);
-    console.log('tomMillis', tomMillis)
     var tomorrow = new Date(tomMillis);
-    console.log('tomorrow', tomorrow);
     var tomorrowFormatted = [tomorrow.getUTCDate(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCFullYear()].join('-');
     // reminders for today
     Reminder.find({date: tomorrowFormatted})
     .then((remindersTomorrow) => (Reminder.find({date: todayFormatted}, (err, remindersToday)=>{
-      console.log(remindersToday);
-      console.log('REMINDERS TOMORROW', remindersTomorrow);
-      console.log('REMINDERS TODAY', remindersToday);
       var tomorrowString = '\nReminders for tomorrow:\n'
       remindersTomorrow.map((activity)=>{
         tomorrowString += activity.subject + '\n'

@@ -23,11 +23,13 @@ app.get('/setup', function (req, res){
 })
 
 app.get('/google/callback', function(req, res){
+  console.log(req.query);
   var code = req.query.code;
   var currentUser;
   console.log(req.query.state);
   User.findOne({slackId: req.query.state})
   .then(function(user) {
+    console.log(user);
     currentUser = user;
     return google.getToken(code)
   })
@@ -47,60 +49,27 @@ app.get('/google/callback', function(req, res){
 app.post('/slack/interactive', function(req, res){
   console.log("In callback");
   var payload = JSON.parse(req.body.payload);
-  console.log(payload);
+  console.log(payload, 52);
   User.findOne({slackId: payload.user.id})
-  .then(function(){
+  .then(function(user){
     if(payload.actions[0].value === 'true'){
-       google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date)
-       .then(function(){
-
-
-         //from Ingrid
-
-         var d = new Date(user.pending.date);
-         console.log('d', d);
-         var dateFormatted = [d.getUTCDate(), d.getUTCMonth() + 1, d.getUTCFullYear()].join('-');
-         console.log('dateFormatted', dateFormatted)
-         var reminder = new Reminder({
-           subject: message.text,
-           date: dateFormatted,
-           userId: message.user
-         })
-         console.log('REMINDER', reminder)
-         reminder.save(function(err, reminder) {
-           if (err) { console.log('error') }
-         })
-         .then(function(){
-           res.send("Your reminder was confirmed :)")
-         })
-         // console.log('req.body.payload', req.body.payload);
-         var today = new Date();
-         console.log('today', today);
-         var todayFormatted = [today.getUTCDate(), today.getUTCMonth() + 1, today.getUTCFullYear()].join('-');
-         console.log('todayFormatted', todayFormatted);
-         var tomMillis = today.setDate(today.getDate() + 1);
-         console.log('tomMillis', tomMillis)
-         var tomorrow = new Date(tomMillis);
-         console.log('tomorrow', tomorrow);
-         var tomorrowFormatted = [tomorrow.getUTCDate(), tomorrow.getUTCMonth() + 1, tomorrow.getUTCFullYear()].join('-');
-         // reminders for today
-         Reminder.find({date: tomorrowFormatted}, function(err, remindersTomorrow) {
-           console.log('REMINDERS TOMORROW', remindersTomorrow);
-         })
-         // reminders for today
-         Reminder.find({date: todayFormatted}, function(err, remindersToday) {
-           console.log('REMINDERS TODAY', remindersToday);
-         })
-
-       })
+      (user.pending.day ?
+      google.createCalendarEvent(user.google.tokens, 'meeting with' + user.pending.invitee[0], user.pending.day, user.pending.time, user.pending.invitee, user.pending.duration) :
+      google.createCalendarEvent(user.google.tokens, user.pending.subject, user.pending.date))
+      .then(function(){
+        user.pending = null;
+        return user.save()
+      })
+      .then(()=>{
+        res.send("Your reminder has been saved")
+      })
      } else {
-       res.send("Your reminder was canceled")
+       user.pending = null;
+       return user.save()
+       .then(()=>res.send("Your reminder was canceled"))
      }
   })
-  .then(function(user){
-    user.pending = null;
-    return user.save()
-  })
+
  })
 
 var port = process.env.PORT || 3000;

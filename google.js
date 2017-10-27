@@ -19,6 +19,71 @@ function getAuthClient(){
       );
 }
 
+function createSimpleEvent(client, tokens, title, date){
+  console.log(title, 'line 23');
+  return new Promise(function(resolve, reject) {
+      calendar.events.insert({
+          auth: client,
+          calendarId: 'primary',
+          resource: {
+              summary: title,
+              start: {
+                  date,
+                  'timeZone': 'America/Los_Angeles'
+              },
+              end: {
+                  date,
+                  'timeZone': 'America/Los_Angeles'
+              }
+          }
+      }, function(err, res){
+          if (err){
+              reject(err)
+          } else {
+              resolve(tokens)
+          }
+      });
+  });
+}
+
+function createMeeting(client, tokens, title, date, time, attendees, duration, location){
+  console.log(duration, 50);
+  var startDateTime = new Date (date + 'T' + time);
+  var endDateTime = new Date(startDateTime);
+  var durHours = 0;
+  var durMin = 30;
+  if(duration){
+    durHours = duration.unit === 'h'? duration.amount : 0;
+    durMin = duration.unit === 'm'? duration.amount : 0;
+  }
+  endDateTime.setHours(endDateTime.getHours() + parseInt(durHours));
+  endDateTime.setMinutes(endDateTime.getMinutes() + parseInt(durMin));
+  return new Promise(function(resolve, reject) {
+      calendar.events.insert({
+          auth: client,
+          calendarId: 'primary',
+          resource: {
+              summary: title,
+              start: {
+                  dateTime: startDateTime,
+                  'timeZone': 'America/Los_Angeles'
+              },
+              end: {
+                  dateTime: endDateTime,
+                  'timeZone': 'America/Los_Angeles'
+              },
+              'attendees': attendees
+          }
+      }, function(err, res){
+          if (err){
+              reject(err)
+          } else {
+              resolve(tokens)
+          }
+      });
+  });
+}
+
 module.exports = {
     generateAuthUrl(slackId) {
         return getAuthClient().generateAuthUrl({
@@ -43,32 +108,15 @@ module.exports = {
     });
   },
 
-    createCalendarEvent(tokens, title, date){
+    createCalendarEvent(tokens, title, date, time, attendees, duration, location){
+      console.log(title);
         var client = getAuthClient()
         client.setCredentials(tokens);
-        return new Promise(function(resolve, reject) {
-            calendar.events.insert({
-                auth: client,
-                calendarId: 'primary',
-                resource: {
-                    summary: title,
-                    start: {
-                        date,
-                        'timeZone': 'America/Los_Angeles'
-                    },
-                    end: {
-                        date,
-                        'timeZone': 'America/Los_Angeles'
-                    }
-                }
-            }, function(err, res){
-                if (err){
-                    reject(err)
-                } else {
-                    resolve(tokens)
-                }
-            });
-        });
+        if(attendees){
+          return createMeeting(client, tokens, title, date, time, attendees, duration);
+        } else {
+          return createSimpleEvent(client, tokens, title, date);
+        }
       },
 
       recheckExpiration(originalUser, expToken) {
