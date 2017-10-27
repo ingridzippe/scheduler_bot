@@ -7,9 +7,10 @@ var token = process.env.SLACK_API_TOKEN || '';
 var rtm = new RtmClient(token);
 var web = new WebClient(token);
 
-var {User, Reminder} = require('./models/models');
+var {User, Reminder, Meeting} = require('./models/models');
 rtm.start();
 
+//attachments for confirmation
 function generateAttachments(){
   var attachments = [
      {
@@ -37,17 +38,19 @@ function generateAttachments(){
   return attachments
 }
 
-var lastMessage = {};
-
+//Generate text for confirmation
 function generateText(data){
   var text;
   var invites = '';
   var duration = '';
-  console.log(data, 46);
+
+  //Modifies string for grammatical accuracy
   if(data.invitee){
     data.invitee.forEach(function(person, index){
       if(index === data.invitee.length - 1 && data.invitee.length > 1){
         invites = invites + ` and ${person}`
+      } else if (index === data.invitee.length - 2 && data.invitee.length > 1) {
+        invites += ` ${person}`
       } else {
         invites = invites + ` ${person},`
       }
@@ -64,126 +67,127 @@ function generateText(data){
   return text;
 }
 
-// function generateText(data){
-//   var text;
-//   var invites = '';
-//   var duration = '';
-//   if(data.invitee){
-//     data.invitee.forEach(function(person, index){
-//       if(index === data.invitee.length - 1 && data.invitee.length > 1){
-//         invites = invites + ` and ${person}`
-//       } else {
-//         invites = invites + ` ${person},`
-//       }
-//     })
-//     if(data.duration){
-//       duration = `for ${data.duration.amount}${data.duration.unit}`;
-//     }
-//     text = `Would you like me to schedule a meeting with ${invites} on
-//     ${data.day} at ${data.time} ${duration}?`
-//     //if yes or no
-//     if (yes){
-//         data.invitee.forEach(function(person, index){
-//             User.find({slackId: data.slackId}, function(user) {
-//                 if (user.channel){
-//                     web.chat.postMessage(
-//                         user.channel,
-//                         `${inviter} invited you to a meeting on ${data.day} at ${data.time} for ${duration}. Are you able to make this?`,
-//                         {attachments: generateAttachments()}
-//                 } else {
-//                     web.im.open(event.user)
-//                         .then((res)=>{
-//                             web.chat.postMessage(
-//                                 res.channel.id,
-//                                 `${inviter} invited you to a meeting on ${data.day} at ${data.time} for ${duration}. Are you able to make this?`,
-//                                 {attachments: generateAttachments()})
-//                         })
-//
-//                 }
-//             )}
-//         })
-//         var meeting = new Meeting({
-//             summary: 'subject',
-//             description: 'description',
-//             times: {
-//               start: data.day + data.time,
-//               end: data.day,
-//               timeZone: 'America/Los_Angeles'
-//             },
-//             attendees: data.invitee,
-//             pending: true
-//         })
-//         meeting.save();
-//     } else { return; }
-//   } else {
-//     text = `Would you like me to remind you to ${data.subject} on
-//     ${data.date}?`
-//   }
-//   return text;
-// }
+//remind user of pending confirmations
+function confirmationAlert(user){
+  return web.im.open(user.slackId)
+  .then((res)=>{
+    return web.chat.postMessage(res.channel.id,
+       "You first must repond to the most recent prompt:\n" + generateText(user.pending),
+       {attachments: generateAttachments()},
+     function(err, res){
+       if( err ){
+         console.log('error: ', err);
+       } else {
+         console.log('Reply sent ', res);
+       }
+     });
+  })
 
-function handleDialogflowConvo(user, message) {
-  console.log("USER PENDING", user.pending);
-  if(user.pending){
-    return web.im.open(user.slackId)
-    .then((res)=>{
-      return web.chat.postMessage(res.channel.id,
-         "You first must repond to the most recent prompt:\n" + generateText(user.pending),
-         {attachments: generateAttachments()},
-       function(err, res){
-         if( err ){
-           console.log('error: ', err);
-         } else {
-           console.log('Reply sent ', res);
-         }
-       });
-    })
+}
 
+//function that fills array of attendees with name and email
+function createAttendeeArray(response, message, attendees){
+  console.log(attendees);
+  attendees = attendees.slice();
+
+  //looks for team members slackIds in the message and returns an array full of them
+  function recurse(string, array){
+    if(string.indexOf('>') === -1){
+      return array;
+    } else {
+      array = array.slice();
+      var memberIdString = string.slice(string.indexOf('<'), string.indexOf('>') + 1);
+      string = string.slice(string.indexOf('>') + 1);
+      var memberId = memberIdString.slice(2, 11);
+      array.push(memberId);
+      return recurse(string, array)
+    }
   }
-  web.users.list(message.team)
-  .then(function(response){
-    console.log(response);
-    var { members } = response;
-    var memberIdString = message.text.slice(message.text.indexOf('<'), message.text.indexOf('>') + 1);
-    var memberId = memberIdString.slice(2, 11);
-    members.forEach(function(member){
-      if(member.id === memberId){
-        message.text = message.text.replace(memberIdString, member.real_name.split(' ')[0]);
-      }
-    })
-  })
-  .then(function(){
-    console.log(message.text);
-    return dialogueflow.interpretUserMessage(message.text, message.user)
-  })
-  .then(function(res){
-    var { data } = res;
-      if(data.result.actionIncomplete){
-        web.chat.postMessage(message.channel, data.result.fulfillment.speech)
-      } else {
-        user.pending = Object.assign({}, data.result.parameters);
-        user.save()
-        .then(function(){
-          lastMessage.channel = message.channel;
-          lastMessage.parameters = data.result.parameters,
-          web.chat.postMessage(message.channel,
-             generateText(data.result.parameters),
-             {attachments: generateAttachments()},
-           function(err, res){
-             if( err ){
-               console.log('error: ', err);
-             } else {
-               console.log('Reply sent ', res);
-             }
-           })
 
+  //extract the array of members from the users info
+  var { members } = response;
 
-        })
-        .catch(function(err){
-          console.log('Error sending message to Dialogflow', err)
-        })
+  //find slackIds
+  var memberIds = recurse(message.text, []);
+
+  async function addToArray() {
+    for(var memberId of memberIds){
+      for(var member of members){
+        if(member.id === memberId){
+          message.text = message.text.replace('<@' + memberId + '>', member.real_name.split(' ')[0]);
+          var account = await web.users.info(memberId);
+          console.log(account.user.profile, 155);
+          attendees.push({name:  account.user.profile.real_name, email: account.user.profile.email})
+          console.log(attendees, "Directly under push");
+          }
       }
+    }
+
+    return attendees
+  }
+
+  return addToArray()
+  .then((attendees)=>( { attendees, text: message.text }))
+
+  console.log("\n\n\n\n", attendees, "At 126", "\n\n\n\n");
+
+}
+
+//Handles all text entries by the client
+function handleDialogflowConvo(user, message) {
+
+  //check for outstanding confirmations
+  if(user.pending){
+    console.log(user.pending);
+    return confirmationAlert(user)
+  }
+
+  console.log("\n\n", message, "\n\n");
+
+  //find email for current user and push them to attendees
+  var attendees = [];
+  var text = '';
+  web.users.info(user.slackId)
+  .then((account) => attendees.push({name: account.user.profile.real_name, email: account.user.profile.email}))
+  .then(()=>{
+    //then find all the users information within this slack team
+    web.users.list(message.team)
+    .then((response) => {
+      return createAttendeeArray(response, message, attendees)
     })
+    .then((obj)=>{
+      attendees = obj.attendees.slice();
+      text = obj.text
+      console.log(text);
+      return dialogueflow.interpretUserMessage(text, message.user)
+    })
+    .then(function(res){
+      var { data } = res;
+      console.log("\n\n\n\n", data, "\n\n\n\n")
+        if(data.result.actionIncomplete){
+          web.chat.postMessage(message.channel, data.result.fulfillment.speech)
+        } else {
+          console.log("\n\n\n", attendees, "\n\n\n");
+          user.pending = Object.assign({}, data.result.parameters, {invitee: attendees.map((person)=>person.name)});
+          user.save()
+          .then(function(){
+            web.chat.postMessage(message.channel,
+               generateText(data.result.parameters),
+               {attachments: generateAttachments()},
+             function(err, res){
+               if( err ){
+                 console.log('error: ', err);
+               } else {
+                 console.log('Reply sent ', res);
+               }
+             })
+          })
+          .catch(function(err){
+            console.log('Error sending message to Dialogflow', err)
+          })
+        }
+      })
+  })
 }
 
 rtm.on(RTM_EVENTS.PRESENCE_CHANGE, function(event){
@@ -219,13 +223,16 @@ rtm.on(RTM_EVENTS.MESSAGE, function handleRtmMessage(message) {
         return;
     }
     User.findOrCreate(message.user)
-    .then(function(user){
-      if (user.google.isSetupComplete) {
-        google.recheckExpiration(user, user.google.tokens.expiry_date);
-        handleDialogflowConvo(user, message);
-      } else {
-        web.chat.postMessage(message.channel, `Hello,
-  I'm Scheduler Bot. Please give me access to your Google Calendar ${process.env.DOMAIN}/setup?slackId=${message.user}`)
-      }
-    });
+    .then((user)=>{
+        user.save()
+        .then(function(){
+          if (user.google.isSetupComplete) {
+            google.recheckExpiration(user, user.google.tokens.expiry_date);
+            handleDialogflowConvo(user, message);
+          } else {
+            web.chat.postMessage(message.channel, `Hello,
+      I'm Scheduler Bot. Please give me access to your Google Calendar ${process.env.DOMAIN}/setup?slackId=${message.user}`)
+          }
+        })
+      })
   });
