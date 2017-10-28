@@ -19,14 +19,7 @@ var UserSchema = new mongoose.Schema({
       email: String
     },
     pending: Object
-    // Channel: String,
-    // Consent: String,
-    // Tokens: {
-    //     access_token: String,
-    //     refresh_token: String,
-    //     refresh_token: String,
-    //     expiry_date: String
-    // }
+  
 })
 
 var ReminderSchema = new mongoose.Schema({

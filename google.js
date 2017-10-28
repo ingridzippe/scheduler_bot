@@ -19,23 +19,70 @@ function getAuthClient(){
       );
 }
 
-function createSimpleEvent(client, tokens, title, date){
-  console.log(title, 'line 23');
-
+function recheckExpiration(originalUser) {
+  var today = new Date().valueOf()
+  var tokens = originalUser.google.tokens;
+  if (today > tokens.expToken){
+  var authClient = getAuthClient()
+  authClient.setCredentials({
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expiry_date: (new Date()).getTime() + (1000 * 60 * 60 * 24 * 7)
+        })
+  authClient.refreshAccessToken(function(err, tokens){
+      if (err){
+          console.log('there was an error: ', err)
+      }
+      User.update({slackId: originalUser.slackId}, {
+          google: {
+              tokens: tokens
+      }}).exec(function(err, raw){
+          if (err){
+              console.log(`there was an error`)
+          } else {
+              console.log('Your user has been saved with the new tokens')
+              return originalUser;
+          }
+        }
+      )
+    })
+  } else {
+    return originalUser;
+  }
 }
-
 
 
 module.exports = {
     generateAuthUrl(slackId) {
-        return getAuthClient().generateAuthUrl({
-          access_type: 'offline',
-          prompt: 'consent',
-          scope,
-          state: slackId
-          })
-        },
+    return getAuthClient().generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope,
+      state: slackId
+      })
+    },
 
+
+    async getCalendars(tokens, attendee){
+      console.log(attendee.slackId);
+      var user = await User.findOne({slackId: attendee.slackId})
+      console.log("Found user!");
+      user = recheckExpiration(user);
+      var client = getAuthClient()
+      client.setCredentials(user.google.tokens);
+      return new Promise(function(resolve, reject) {
+          calendar.events.list({
+              auth: client,
+              calendarId: attendee.email,
+          }, function(err, res){
+              if (err){
+                  reject(err)
+              } else {
+                  resolve(res.items)
+              }
+          });
+      });
+    },
 
     getToken(code) {
     var client = getAuthClient();
@@ -51,7 +98,6 @@ module.exports = {
   },
 
     createCalendarEvent(tokens, title, date){
-      console.log(title);
         var client = getAuthClient()
         client.setCredentials(tokens);
         return new Promise(function(resolve, reject) {
@@ -62,11 +108,11 @@ module.exports = {
                     summary: title,
                     start: {
                         date,
-                        'timeZone': 'America/Los_Angeles'
+                        // 'timeZone': 'America/Los_Angeles'
                     },
                     end: {
                         date,
-                        'timeZone': 'America/Los_Angeles'
+                        // 'timeZone': 'America/Los_Angeles'
                     }
                 }
             }, function(err, res){
@@ -108,34 +154,6 @@ module.exports = {
             });
         });
       },
+      recheckExpiration,
 
-      recheckExpiration(originalUser, expToken) {
-        var today = new Date().valueOf()
-        var tokens = originalUser.google.tokens;
-        if (today > expToken){
-        var authClient = getAuthClient()
-        authClient.setCredentials({
-                access_token: originalUser.google.tokens.access_token,
-                refresh_token: originalUser.google.tokens.refresh_token,
-                expiry_date: (new Date()).getTime() + (1000 * 60 * 60 * 24 * 7)
-              })
-        authClient.refreshAccessToken(function(err, tokens){
-            console.log(tokens)
-            if (err){
-                console.log('there was an error: ', err)
-            }
-            User.update({slackId: originalUser.slackId}, {
-                google: {
-                    tokens: tokens
-            }}).exec(function(err, raw){
-                if (err){
-                    console.log(`there was an error`)
-                } else {
-                    return console.log('Your user has been saved with the new tokens')
-                }
-              }
-            )
-          })
-        }
-      }
 }
