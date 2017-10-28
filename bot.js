@@ -11,7 +11,9 @@ var {User, Reminder, Meeting} = require('./models/models');
 rtm.start();
 
 //attachments for confirmation
-function generateAttachments(){
+function generateAttachments(attendees){
+  console.log(attendees, 'INSIDE GENERATE ATTACHMENTS');
+  value = attendees[0].email ? attendees : "true";
   var attachments = [
      {
          "callback_id": "schedule_response",
@@ -22,7 +24,7 @@ function generateAttachments(){
                  "name": "confirm",
                  "text": "Yes",
                  "type": "button",
-                 "value": "true",
+                 "value": JSON.stringify(attendees),
                  "style": "default"
              },
              {
@@ -73,7 +75,7 @@ function confirmationAlert(user){
   .then((res)=>{
     return web.chat.postMessage(res.channel.id,
        "You first must repond to the most recent prompt:\n" + generateText(user.pending),
-       {attachments: generateAttachments()},
+       {attachments: generateAttachments(user.pending.attendees)},
      function(err, res){
        if( err ){
          console.log('error: ', err);
@@ -87,7 +89,7 @@ function confirmationAlert(user){
 
 //function that fills array of attendees with name and email
 function createAttendeeArray(response, message, attendees){
-  console.log(attendees);
+  console.log(attendees, "Inside createAttendeeArray");
   attendees = attendees.slice();
 
   //looks for team members slackIds in the message and returns an array full of them
@@ -117,7 +119,7 @@ function createAttendeeArray(response, message, attendees){
           message.text = message.text.replace('<@' + memberId + '>', member.real_name.split(' ')[0]);
           var account = await web.users.info(memberId);
           console.log(account.user.profile, 155);
-          attendees.push({name:  account.user.profile.real_name, email: account.user.profile.email})
+          attendees.push({name:  account.user.profile.real_name, email: account.user.profile.email, slackId: memberId})
           console.log(attendees, "Directly under push");
           }
       }
@@ -148,7 +150,7 @@ function handleDialogflowConvo(user, message) {
   var attendees = [];
   var text = '';
   web.users.info(user.slackId)
-  .then((account) => attendees.push({name: account.user.profile.real_name, email: account.user.profile.email}))
+  .then((account) => attendees.push({name: account.user.profile.real_name, email: account.user.profile.email, slackId: user.slackId}))
   .then(()=>{
     //then find all the users information within this slack team
     web.users.list(message.team)
@@ -158,22 +160,19 @@ function handleDialogflowConvo(user, message) {
     .then((obj)=>{
       attendees = obj.attendees.slice();
       text = obj.text
-      console.log(text);
       return dialogueflow.interpretUserMessage(text, message.user)
     })
     .then(function(res){
       var { data } = res;
-      console.log("\n\n\n\n", data, "\n\n\n\n")
         if(data.result.actionIncomplete){
           web.chat.postMessage(message.channel, data.result.fulfillment.speech)
         } else {
-          console.log("\n\n\n", attendees, "\n\n\n");
-          user.pending = Object.assign({}, data.result.parameters, {invitee: attendees.map((person)=>person.name)});
+          user.pending = Object.assign({}, data.result.parameters, {invitee: attendees.map((person)=>person.name)}, {attendees: attendees});
           user.save()
           .then(function(){
             web.chat.postMessage(message.channel,
                generateText(data.result.parameters),
-               {attachments: generateAttachments()},
+               {attachments: generateAttachments(attendees)},
              function(err, res){
                if( err ){
                  console.log('error: ', err);
